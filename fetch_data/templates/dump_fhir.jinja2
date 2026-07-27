@@ -1,0 +1,17 @@
+UNLOAD (
+    SELECT target.*
+    FROM {{fhir_resource}} AS target
+        INNER JOIN {{ cohort_id }} AS my_patients ON 
+            {% if fhir_resource == "patient" %}
+                target.id = my_patients.patient_ref
+            {% elif fhir_resource in ["allergyintolerance", "device", "episodeofcare", "immunization"] %}
+                replace(target.patient.reference, 'Patient/', '') = my_patients.patient_ref
+            {% else %}
+                replace(target.subject.reference, 'Patient/', '') = my_patients.patient_ref
+            {% endif %}
+)
+TO '{{s3_path}}{{fhir_resource}}'
+WITH (
+    format = 'PARQUET',
+    compression = 'SNAPPY'
+)

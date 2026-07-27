@@ -15,17 +15,22 @@ uv sync
 
 Set up parquet files. They should have a structure like this:
 
-```
-fhir_root/
-├─ patient/
-│  ├─ 1.parquet
-├─ observation/
-│  ├─ 1.parquet
-│  ├─ 2.parquet
-│  ├─ 3.parquet
-├─ encounter/
-│  ├─ 1.parquet
-│  ├─ 2.parquet
+```txt
+storage_root/
+├─ my_cohort/
+│  ├─ patient/
+│  │  ├─ 1.parquet
+│  ├─ observation/
+│  │  ├─ 1.parquet
+│  │  ├─ 2.parquet
+│  │  ├─ 3.parquet
+|  ├─ encounter/
+│  │  ├─ 1.parquet
+│  │  ├─ 2.parquet
+├─ my_cohort_1/
+│  ├─ patient/
+│  │  ├─ 1.parquet
+...
 ```
 
 Run query:
@@ -46,6 +51,14 @@ above. After editing the example samconfig and uploading your parquets, you can 
 sam build
 sam deploy --config-file example_samconfig.toml --config-env dev --guided
 ```
+
+You can load data for the API to consume either by uploading ndjsons or parquet files to your FhirDataBucket,
+or by constructing a cohort from existing Cumulus data housed in Athena. To do this:
+
+1. Construct a cohort of patient refs, and save it as a table, ex: `my_cumulus_cohort`. The refs should be
+in the format `<anon_id>`, NOT `Patient/<anon_id>`
+2. Call the `/build` endpoint. It's probably easiest to just do this via the test functionality
+in API gateway, but you could also curl it. Remember that it's a POST. Use your table name as your cohort_id.
 
 ## Architecture
 

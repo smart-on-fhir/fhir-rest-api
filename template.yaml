@@ -11,6 +11,15 @@ Parameters:
   FHIRSourceBucket:
     Type: String
     Description: S3 bucket where the Lambda loads FHIR data from.
+  AthenaDatabase:
+    Type: String
+    Description: Athena database to use for fetch queries.
+  AthenaSourceBucket:
+    Type: String
+    Description: S3 bucket containing source data for Athena queries.
+  AthenaETLBucket:
+    Type: String
+    Description: S3 bucket containing etl data for Athena queries.
   WafArn:
     Type: String
     Description: AWS WAF (Firewall) resource id. Ex arn:aws:wafv2:us-east-1:123456789012:regional/webacl/my-existing-waf/abc12345-d123-ef45-6789-abcdef123456
@@ -20,6 +29,34 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub fhir-sandbox-${Environment}-${AWS::AccountId}
+
+  # Queue to hold incoming build jobs from API Gateway
+  FetchQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub fetch-queue-${Environment}
+      # VisibilityTimeout should exceed FetchFunction's 900s timeout
+      VisibilityTimeout: 960
+
+  # IAM Role allowing API Gateway to put messages into FetchQueue
+  ApiGatewaySqsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: apigateway.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: SQSWritePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: sqs:SendMessage
+                Resource: !GetAtt FetchQueue.Arn
 
   FhirApi:
     Type: AWS::Serverless::Api
@@ -33,6 +70,37 @@ Resources:
       MethodSettings:
         - ResourcePath: '/*'
           HttpMethod: '*'
+      MergeDefinitions: true
+      DefinitionBody:
+        openapi: '3.0.1'
+        paths:
+          /{cohort_id}/fhir/build:
+            post:
+              summary: Async queue ingress for FHIR builds
+              parameters:
+                - name: cohort_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+              responses:
+                '202':
+                  description: "Build request accepted"
+              x-amazon-apigateway-integration:
+                type: "aws"
+                httpMethod: "POST"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:sqs:path/${AWS::AccountId}/${FetchQueue.QueueName}"
+                credentials: !GetAtt ApiGatewaySqsRole.Arn
+                requestParameters:
+                  integration.request.header.Content-Type: "'application/x-www-form-urlencoded'"
+                requestTemplates:
+                  application/json: "Action=SendMessage&MessageBody=$util.urlEncode(\"{\"\"cohort_id\"\":\"\"$input.params('cohort_id')\"\"}\")"
+                passthroughBehavior: "never"
+                responses:
+                  default:
+                    statusCode: "202"
+                    responseTemplates:
+                      application/json: '{"status": "Accepted", "message": "Build job queued successfully"}'
 
   FhirApiWafAssociation:
     Type: AWS::WAFv2::WebACLAssociation
@@ -76,6 +144,75 @@ Resources:
             RestApiId: !Ref FhirApi
             Path: /{cohort_id}/fhir/{fhir_resource}/count
             Method: POST
+
+  FetchFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub fetch-sandbox-${Environment}
+      Runtime: python3.14
+      Handler: lambda.lambda_handler
+      CodeUri: fetch_data/
+      MemorySize: 512
+      Timeout: 900
+      Environment:
+        Variables:
+          ATHENA_DATABASE: !Ref AthenaDatabase
+          ATHENA_OUTPUT_BUCKET: !Ref FHIRSourceBucket
+          ATHENA_SOURCE_BUCKET: !Ref AthenaSourceBucket
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - athena:StartQueryExecution
+                - athena:GetQueryExecution
+                - athena:GetQueryResults
+                - athena:GetTableMetadata
+                - athena:GetTable
+                - athena:GetDatabase
+                - athena:GetPartitions
+                - glue:GetDatabase
+                - glue:GetTable
+                - glue:GetTables
+                - glue:GetPartition
+                - glue:GetPartitions
+                - glue:GetTableVersion
+                - glue:GetTableVersions
+                # - athena:*
+                - kms:Decrypt
+                - kms:DescribeKey
+                - kms:GenerateDataKey
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+                - s3:PutObjectAcl
+                - s3:ListBucket
+                - s3:GetBucketLocation
+              Resource:
+                - !Sub arn:${AWS::Partition}:s3:::${FHIRSourceBucket}
+                - !Sub arn:${AWS::Partition}:s3:::${FHIRSourceBucket}/*
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:ListBucket
+              Resource:
+                - !Sub arn:${AWS::Partition}:s3:::${AthenaETLBucket}
+                - !Sub arn:${AWS::Partition}:s3:::${AthenaETLBucket}/*
+                - !Sub arn:${AWS::Partition}:s3:::${AthenaSourceBucket}
+                - !Sub arn:${AWS::Partition}:s3:::${AthenaSourceBucket}/*
+            - Effect: Allow
+              Action:
+                - sqs:ReceiveMessage
+                - sqs:DeleteMessage
+                - sqs:GetQueueAttributes
+              Resource: !GetAtt FetchQueue.Arn
+
+      Events:
+        FetchQueueEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt FetchQueue.Arn
+            BatchSize: 1
 
   ConverterFunction:
     Type: AWS::Serverless::Function
