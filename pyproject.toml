@@ -27,4 +27,4 @@ pythonpath = [
 
 # Move the environment variables to this dedicated section
 [tool.pytest_env]
-LOCAL_ROOT = "./test_data/my_parquet_cohort/"
+LOCAL_ROOT = "./test_data/"

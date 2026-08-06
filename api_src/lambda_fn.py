@@ -1,4 +1,5 @@
 import argparse
+import datetime
 import json
 import logging
 import math
@@ -27,17 +28,24 @@ def run_count_query(event) -> dict:
             "statusCode": 500,
             "body": "Data size exceeds 9GB lambda storage constraint.",
         }
-
-    if resource in resources:
+    try:
+        # We'll get the exact case of the S3 path for file fetching
+        index = [x.lower() for x in resources].index(resource)
+        s3_resource = resources[index]
         logger.info("Fetching counts")
-        count = query.get_fhir_count(resource, patients)
+        count = query.get_fhir_count(s3_resource, cohort_id, patients)
         logger.info(f"Count for resource {resource} is {count}")
         return {"statusCode": 200, "body": count}
-    else:
+    except ValueError:
         return {
             "statusCode": "404",
             "body": f"Resource {resource} not found",
         }
+
+
+def _json_type_check(obj):
+    if isinstance(obj, datetime.datetime):
+        return obj.isoformat()
 
 
 def run_fhir_query(event) -> dict:
@@ -52,15 +60,19 @@ def run_fhir_query(event) -> dict:
             "statusCode": 500,
             "body": "Data size exceeds 9GB lambda storage constraint.",
         }
-
-    if resource in resources:
+    try:
+        # We'll get the exact case of the S3 path for file fetching
+        index = [x.lower() for x in resources].index(resource)
+        s3_resource = resources[index]
         logger.info("Fetching counts")
-        count = query.get_fhir_count(resource, patients)
+        count = query.get_fhir_count(s3_resource, cohort_id, patients)
         logger.info(f"Count for resource {resource} is {count}")
         logger.info("Fetching data")
-        data = query.get_fhir_data(resource, fields, patients, offset, limit)
+        data = query.get_fhir_data(
+            s3_resource, cohort_id, fields, patients, offset, limit
+        )
         logger.info("Processing data")
-        resources.remove(resource)
+        resources.remove(s3_resource)
         body = {
             "fhir": data,
             "pagination": {
@@ -76,8 +88,8 @@ def run_fhir_query(event) -> dict:
             "otherResources": resources,
         }
         logger.info("Done")
-        return {"statusCode": 200, "body": json.dumps(body)}
-    else:
+        return {"statusCode": 200, "body": json.dumps(body, default=_json_type_check)}
+    except ValueError:
         return {
             "statusCode": "404",
             "body": f"Resource {resource} not found",
@@ -86,10 +98,11 @@ def run_fhir_query(event) -> dict:
 
 def determine_route(event):
     cohort_id, resource, _, _, _, _ = extract_params(event)
-    route = event.get("resource")
-    if route == f"/{cohort_id}/fhir/{resource}/count":
+    route = event.get("path")
+    base_route = f"/{cohort_id}/fhir/{resource}"
+    if route in [f"{base_route}/count", f"{base_route}/count/"]:
         return run_count_query
-    if route == f"/{cohort_id}/fhir/{resource}":
+    if route in [f"{base_route}", f"{base_route}/"]:
         return run_fhir_query
     return lambda e: {"statusCode": "404", "body": "Route not found"}
 
@@ -124,4 +137,3 @@ if __name__ == "__main__":
         "queryStringParameters": {"offset": args.offset, "limit": args.limit},
         "body": args.body,
     }
-    print(lambda_handler(event, None))

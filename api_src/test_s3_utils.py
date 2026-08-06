@@ -53,6 +53,7 @@ def test_should_download_s3_objects_to_local_dir(tmp_path):
         )
 
         s3_utils.download_s3_parquets("example-bucket", "prefix/", tmp_path)
+        print(tmp_path)
 
-        assert (tmp_path / "file1.parquet").read_bytes() == b"abc"
-        assert (tmp_path / "file2.parquet").read_bytes() == b"defgh"
+        assert (tmp_path / "prefix/file1.parquet").read_bytes() == b"abc"
+        assert (tmp_path / "prefix/file2.parquet").read_bytes() == b"defgh"

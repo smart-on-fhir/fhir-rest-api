@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: SAM template for the FHIR Sandbox API.
+Description: SAM template for the FHIR REST API.
 
 Parameters:
   Environment:
@@ -8,18 +8,12 @@ Parameters:
     Default: dev
     AllowedPattern: '[A-Za-z0-9-]+'
     Description: Deployment environment name (for example dev or prod).
-  FHIRSourceBucket:
-    Type: String
-    Description: S3 bucket where the Lambda loads FHIR data from.
-  WafArn:
-    Type: String
-    Description: AWS WAF (Firewall) resource id. Ex arn:aws:wafv2:us-east-1:123456789012:regional/webacl/my-existing-waf/abc12345-d123-ef45-6789-abcdef123456
 
 Resources:
   FhirDataBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub fhir-sandbox-${Environment}-${AWS::AccountId}
+      BucketName: !Sub fhir-rest-api-${Environment}-${AWS::AccountId}
 
   FhirApi:
     Type: AWS::Serverless::Api
@@ -34,16 +28,10 @@ Resources:
         - ResourcePath: '/*'
           HttpMethod: '*'
 
-  FhirApiWafAssociation:
-    Type: AWS::WAFv2::WebACLAssociation
-    Properties:
-      ResourceArn: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/restapis/${FhirApi}/stages/${Environment}
-      WebACLArn: !Ref WafArn
-
   FhirFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub fhir-sandbox-${Environment}
+      FunctionName: !Sub fhir-rest-api-${Environment}
       Runtime: python3.14
       Handler: lambda_fn.lambda_handler
       CodeUri: api_src/
@@ -53,11 +41,12 @@ Resources:
       Timeout: 30
       Environment:
         Variables:
-          SOURCE_BUCKET: !Ref FHIRSourceBucket
+          SOURCE_BUCKET: !Sub fhir-rest-api-${Environment}-${AWS::AccountId}
           HOME: /tmp/
+          LOCAL_ROOT: !Sub /tmp/fhir-rest-api-${Environment}-${AWS::AccountId}
       Policies:
         - S3ReadPolicy:
-            BucketName: !Sub fhir-sandbox-${Environment}-${AWS::AccountId}
+            BucketName: !Sub fhir-rest-api-${Environment}-${AWS::AccountId}
         - Statement:
             - Effect: Allow
               Action:
@@ -80,7 +69,7 @@ Resources:
   ConverterFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub fhir-sandbox-${Environment}-converter
+      FunctionName: !Sub fhir-rest-api-${Environment}-converter
       Runtime: python3.14
       Handler: lambda_fn.lambda_handler
       CodeUri: convert_src/
@@ -93,14 +82,14 @@ Resources:
           HOME: /tmp/
       Policies:
         - S3ReadPolicy:
-            BucketName: !Sub fhir-sandbox-${Environment}-${AWS::AccountId}
+            BucketName: !Sub fhir-rest-api-${Environment}-${AWS::AccountId}
         - S3WritePolicy:
-            BucketName: !Sub fhir-sandbox-${Environment}-${AWS::AccountId}
+            BucketName: !Sub fhir-rest-api-${Environment}-${AWS::AccountId}
         - Statement:
             - Effect: Allow
               Action:
                 - s3:DeleteObject
-              Resource: !Sub arn:${AWS::Partition}:s3:::fhir-sandbox-${Environment}-${AWS::AccountId}/*
+              Resource: !Sub arn:${AWS::Partition}:s3:::fhir-rest-api-${Environment}-${AWS::AccountId}/*
       Events:
         S3CreateNdjson:
           Type: S3
@@ -112,3 +101,9 @@ Resources:
                 Rules:
                   - Name: suffix
                     Value: .ndjson
+
+Outputs:
+  FhirAPIStageArn:
+    Value: !Sub "arn:aws:apigateway:${AWS::Region}::/restapis/${FhirApi}/stages/${Environment}"
+    Export:
+      Name: !Sub "${AWS::StackName}-FhirAPIArn"
