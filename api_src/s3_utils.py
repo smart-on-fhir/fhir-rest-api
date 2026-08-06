@@ -1,9 +1,8 @@
 import logging
 import os
-import shutil
 import pathlib
+import shutil
 from os import path
-
 
 import boto3
 import env
