@@ -1,0 +1,21 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: SAM template for the FHIR Sandbox API.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedPattern: '[A-Za-z0-9-]+'
+    Description: Deployment environment name (for example dev or prod).
+  WafArn:
+    Type: String
+    Description: AWS WAF (Firewall) resource id. Ex arn:aws:wafv2:us-east-1:123456789012:regional/webacl/my-existing-waf/abc12345-d123-ef45-6789-abcdef123456
+
+Resources:
+  FhirApiWafAssociation:
+    Type: AWS::WAFv2::WebACLAssociation
+    Properties:
+      ResourceArn: 
+        Fn::ImportValue: !Sub "fhir-rest-api-${Environment}-FhirAPIArn"
+      WebACLArn: !Ref WafArn

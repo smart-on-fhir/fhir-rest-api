@@ -3,7 +3,7 @@ from api_src import lambda_fn
 
 def test_should_route_count():
     event = {
-        "resource": "/my_test_cohort/fhir/patient/count",
+        "path": "/my_test_cohort/fhir/patient/count",
         "pathParameters": {
             "fhir_resource": "patient",
             "cohort_id": "my_test_cohort",
@@ -18,7 +18,7 @@ def test_should_route_count():
 
 def test_should_route_fhir():
     event = {
-        "resource": "/my_test_cohort/fhir/patient",
+        "path": "/my_test_cohort/fhir/patient",
         "pathParameters": {
             "fhir_resource": "patient",
             "cohort_id": "my_test_cohort",
