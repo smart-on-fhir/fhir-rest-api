@@ -14,6 +14,50 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub fhir-rest-api-${Environment}-${AWS::AccountId}
+      NotificationConfiguration:
+        QueueConfigurations:
+          - Event: s3:ObjectCreated:*
+            Queue: !GetAtt NdjsonCreatedQueue.Arn
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: suffix
+                    Value: .ndjson
+
+  NdjsonCreatedQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub fhir-rest-api-${Environment}-ndjson-created
+      # Should be >= 6x the consumer Lambda timeout per AWS guidance
+      VisibilityTimeout: 5400
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt NdjsonCreatedDLQ.Arn
+        maxReceiveCount: 1
+
+  NdjsonCreatedDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub fhir-rest-api-${Environment}-ndjson-created-dlq
+      MessageRetentionPeriod: 1209600 # 14 days
+
+  NdjsonCreatedQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref NdjsonCreatedQueue
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: s3.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt NdjsonCreatedQueue.Arn
+            Condition:
+              ArnLike:
+                aws:SourceArn: !Sub arn:${AWS::Partition}:s3:::fhir-rest-api-${Environment}-${AWS::AccountId}
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
 
   FhirApi:
     Type: AWS::Serverless::Api
@@ -91,16 +135,16 @@ Resources:
                 - s3:DeleteObject
               Resource: !Sub arn:${AWS::Partition}:s3:::fhir-rest-api-${Environment}-${AWS::AccountId}/*
       Events:
-        S3CreateNdjson:
-          Type: S3
+        NdjsonCreatedQueue:
+          Type: SQS
           Properties:
-            Bucket: !Ref FhirDataBucket
-            Events: s3:ObjectCreated:*
-            Filter:
-              S3Key:
-                Rules:
-                  - Name: suffix
-                    Value: .ndjson
+            Queue: !GetAtt NdjsonCreatedQueue.Arn
+            BatchSize: 10000
+            # Required whenever BatchSize > 10, so Lambda waits to fill the batch
+            # instead of invoking as soon as a message or two arrives.
+            MaximumBatchingWindowInSeconds: 60
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
 
 Outputs:
   FhirAPIStageArn:

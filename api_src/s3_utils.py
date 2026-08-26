@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import pathlib
@@ -15,7 +16,7 @@ paginator = s3.get_paginator("list_objects_v2")
 NINE_GIGS_IN_BYTES = 9.5 * 1024 * 1024 * 1024
 
 
-def prepare_local_data_dir(resource: str, bucket: str, cohort_id: str) -> bool:
+def prepare_local_data_dir(bucket: str, cohort_id: str) -> bool:
     if bucket:
         # We were seeing significant performance issues when duckdb was reading from S3 directly, so we now download the data to the local /tmp directory first.
         local_dir = pathlib.Path(path.join("/tmp", bucket, cohort_id))
@@ -38,7 +39,7 @@ def prepare_local_data_dir(resource: str, bucket: str, cohort_id: str) -> bool:
             logger.error(f"Data size {size_bytes} bytes exceeds 9GB limit")
             return False
         logger.info(f"Data size is {size_bytes} bytes, proceeding to download")
-        download_s3_parquets(bucket, cohort_id, local_dir)
+        asyncio.run(download_s3_parquets(bucket, cohort_id, local_dir))
         logger.info(f"Downloaded S3 objects to {local_dir}")
         return True
     return True
@@ -55,19 +56,29 @@ def calculate_object_size_bytes(bucket_name: str, prefix: str) -> int:
     return total_bytes
 
 
-def download_s3_parquets(bucket: str, prefix: str, local_dir: pathlib.Path) -> None:
+async def download_s3_parquets(
+    bucket: str, prefix: str, local_dir: pathlib.Path
+) -> None:
     os.makedirs(local_dir, exist_ok=True)
 
     logger.info(
         f"Downloading S3 objects from bucket: {bucket} path: {prefix} to {local_dir}"
     )
 
+    loop = asyncio.get_event_loop()
+
+    def download(key: pathlib.Path, local_path: pathlib.Path) -> None:
+        local_path.parent.mkdir(parents=True, exist_ok=True)
+        s3.download_file(bucket, str(key), str(local_path))
+
+    tasks = []
     for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
         for obj in page.get("Contents", []):
             key = pathlib.Path(obj["Key"])
             local_path = local_dir / key.parent.name / key.name
-            local_path.parent.mkdir(parents=True, exist_ok=True)
-            s3.download_file(bucket, str(key), str(local_path))
+            tasks.append(loop.run_in_executor(None, download, key, local_path))
+
+    await asyncio.gather(*tasks)
 
 
 def list_s3_subdirectories(bucket: str, prefix: str) -> list[str]:

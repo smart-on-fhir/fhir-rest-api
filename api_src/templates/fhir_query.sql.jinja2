@@ -1,18 +1,18 @@
 {% if has_fields and has_patients -%}
 SELECT COLUMNS(col -> list_contains($1, col))
-FROM read_parquet($2)
+FROM read_parquet($2, union_by_name=true)
 WHERE list_contains($3, {{ patient_path }})
 {% elif has_fields -%}
 SELECT COLUMNS(col -> list_contains($1, col))
-FROM read_parquet($2)
+FROM read_parquet($2, union_by_name=true)
 LIMIT $3 OFFSET $4
 {% elif has_patients -%}
 SELECT *
-FROM read_parquet($1)
+FROM read_parquet($1, union_by_name=true)
 WHERE list_contains($2, {{ patient_path }})
 LIMIT $3 OFFSET $4
 {% else -%}
 SELECT *
-FROM read_parquet($1)
+FROM read_parquet($1, union_by_name=true)
 LIMIT $2 OFFSET $3
 {% endif %}
