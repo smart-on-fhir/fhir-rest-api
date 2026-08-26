@@ -1,4 +1,5 @@
 import boto3
+import pytest
 from moto import mock_aws
 
 
@@ -40,7 +41,8 @@ def test_should_calculate_total_size_of_objects():
         assert total_size == 8
 
 
-def test_should_download_s3_objects_to_local_dir(tmp_path):
+@pytest.mark.asyncio
+async def test_should_download_s3_objects_to_local_dir(tmp_path):
 
     with mock_aws():
         from api_src import s3_utils
@@ -52,7 +54,7 @@ def test_should_download_s3_objects_to_local_dir(tmp_path):
             Bucket="example-bucket", Key="prefix/file2.parquet", Body=b"defgh"
         )
 
-        s3_utils.download_s3_parquets("example-bucket", "prefix/", tmp_path)
+        await s3_utils.download_s3_parquets("example-bucket", "prefix/", tmp_path)
         print(tmp_path)
 
         assert (tmp_path / "prefix/file1.parquet").read_bytes() == b"abc"

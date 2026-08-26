@@ -27,9 +27,6 @@ def get_fhir_data(
 ):
     logger.info("Setting up query")
     parquet_pattern = os.path.join(env.local_root, cohort_id, resource, "*")
-    if resource != "patient":
-        patients = [f"Patient/{p}" for p in patients] if patients else []
-
     template = template_env.get_template("fhir_query.sql.jinja2")
     query = template.render(
         has_fields=bool(fields),
@@ -81,6 +78,7 @@ def get_fhir_count(resource: str, cohort_id: str, patients: list[str]) -> int:
 def get_patient_path(resource: str) -> str:
     resource_map = {
         "allergyintolerance": "patient.reference",
+        "appointment": "patient.reference",
         "device": "patient.reference",
         "diagnosticreport": "subject.reference",
         "documentreference": "subject.reference",

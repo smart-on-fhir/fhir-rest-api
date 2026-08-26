@@ -1,6 +1,8 @@
+import dataclasses
+import json
 import logging
 import os
-import re
+import pathlib
 from urllib import parse
 
 import boto3
@@ -12,45 +14,81 @@ logger.setLevel("INFO")
 s3 = boto3.client("s3")
 
 
-def lambda_handler(event, context):
-    for record in event["Records"]:
-        bucket_name = record["s3"].get("bucket", {}).get("name", "")
-        raw_key = record["s3"]["object"]["key"]
-        object_key = parse.unquote_plus(raw_key)
+@dataclasses.dataclass
+class ConversionBatch:
+    src: str
+    dest: str
+    delete_prefix: str
 
-        uses_s3 = bucket_name != ""
-        source = f"s3://{bucket_name}/{object_key}" if uses_s3 else raw_key
-        destination = re.sub(r"ndjson$", "parquet", source)
-        logger.info(f"Converting json in {source} to parquet in {destination}")
-        if uses_s3:
+
+def lambda_handler(event, context):
+    batches, bucket_name = batch_into_fhir_types(event)
+    for fhir_type, batch in batches.items():
+        logger.info(
+            f"Converting {fhir_type} jsons in {batch.src} to parquet in {batch.dest}"
+        )
+        if bucket_name:
             con = create_s3_based_db_con()
             logger.info("Credentials created. Converting...")
         else:
             con = duckdb.connect(":memory:")
             logger.info("No s3 detected in src/dest, using local db")
-
-        convert_json(source, destination, con)
-        delete_json(source, uses_s3)
+        convert_json(batch.src, batch.dest, con)
+        delete_matching(bucket_name, batch.delete_prefix)
     logger.info("Done :)")
 
 
-def delete_json(path: str, in_s3: bool):
-    if in_s3:
-        parsed_url = parse.urlparse(path)
-        bucket = parsed_url.netloc
-        key = parsed_url.path.lstrip("/")
-        logger.info(f"Deleting old json in bucket {bucket} at {key}")
-        s3.delete_object(Bucket=bucket, Key=key)
-    else:
-        logger.info(f"Deleting old json {path}")
-        os.remove(path)
+def batch_into_fhir_types(event) -> tuple[dict[str, ConversionBatch], str]:
+    ndjsons: dict[str, ConversionBatch] = {}
+    bucket = ""
+    for sqs_record in event["Records"]:
+        s3_event = json.loads(sqs_record["body"])
+        for s3_record in s3_event["Records"]:
+            # these events are tied to a single bucket, so this should remain constant
+            bucket = s3_record["s3"]["bucket"]["name"]
+            key = s3_record["s3"]["object"]["key"]
+            key = parse.unquote_plus(key)
+            # key will always be study/fhir_type/filename.ndjson
+            parts = pathlib.Path(key).parts
+            resource = parts[1]
+            ndjson_path = "s3://" + os.path.join(
+                *(bucket,) + parts[:-1] + ("*.ndjson",)
+            )
+            parquet_dest = "s3://" + os.path.join(
+                *(bucket,) + parts[:-1] + (f"{resource}_compacted.parquet",)
+            )
+            delete_prefix = os.path.join(*parts[:-1])
+            ndjsons[resource] = ConversionBatch(
+                ndjson_path, parquet_dest, delete_prefix
+            )
+    return ndjsons, bucket
+
+
+def delete_matching(bucket_name, prefix, suffix=".ndjson"):
+    logger.info(f"Deleting ndjsons from bucket with prefix {prefix}..")
+    paginator = s3.get_paginator("list_objects_v2")
+    deleted = 0
+
+    for page in paginator.paginate(Bucket=bucket_name, Prefix=prefix):
+        keys = [
+            {"Key": obj["Key"]}
+            for obj in page.get("Contents", [])
+            if obj["Key"].endswith(suffix)
+        ]
+        if not keys:
+            continue
+        resp = s3.delete_objects(Bucket=bucket_name, Delete={"Objects": keys})
+        deleted += len(resp.get("Deleted", []))
+        if "Errors" in resp:
+            print("Failed to delete:", resp["Errors"])
+    logger.info(f"Deleted {deleted} files")
 
 
 def convert_json(source: str, destination: str, con: duckdb.DuckDBPyConnection):
     logger.info(f"Converting json {source} to {destination}")
     query = """
         COPY (
-            SELECT * 
+            SELECT * REPLACE (id::VARCHAR AS id)
             FROM read_ndjson_auto(?, union_by_name=true)
         ) 
         TO ? 
