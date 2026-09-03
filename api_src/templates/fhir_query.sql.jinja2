@@ -1,7 +1,14 @@
 {% if has_fields and has_patients -%}
 SELECT COLUMNS(col -> list_contains($1, col))
 FROM read_parquet($2, union_by_name=true)
+{% if fhir_type == "appointment" -%}
+WHERE list_has_any(
+    list_transform(participant, p -> p.actor.reference),
+    $3
+)
+{% else -%}
 WHERE list_contains($3, {{ patient_path }})
+{% endif %}
 {% elif has_fields -%}
 SELECT COLUMNS(col -> list_contains($1, col))
 FROM read_parquet($2, union_by_name=true)
@@ -9,7 +16,14 @@ LIMIT $3 OFFSET $4
 {% elif has_patients -%}
 SELECT *
 FROM read_parquet($1, union_by_name=true)
+{% if fhir_type == "appointment" -%}
+WHERE list_has_any(
+    list_transform(participant, p -> p.actor.reference),
+    $2
+)
+{% else -%}
 WHERE list_contains($2, {{ patient_path }})
+{% endif %}
 LIMIT $3 OFFSET $4
 {% else -%}
 SELECT *

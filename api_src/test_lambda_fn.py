@@ -3,6 +3,35 @@ import pytest
 from api_src import lambda_fn
 
 
+def test_route_resources():
+    event = {
+        "path": "/my_test_cohort/fhir/resources",
+        "pathParameters": {
+            "fhir_resource": "resources",
+            "cohort_id": "my_test_cohort",
+        },
+    }
+    actual_fn = lambda_fn.determine_route(event)
+    expected_fn = lambda_fn.run_resource_query
+
+    assert actual_fn.__code__.co_code == expected_fn.__code__.co_code
+
+
+def test_route_patient():
+    event = {
+        "path": "/my_test_cohort/fhir/patient/patient_id_1",
+        "pathParameters": {
+            "fhir_resource": "patient",
+            "cohort_id": "my_test_cohort",
+            "patient_id": "patient_id_1",
+        },
+    }
+    actual_fn = lambda_fn.determine_route(event)
+    expected_fn = lambda_fn.run_patient_query
+
+    assert actual_fn.__code__.co_code == expected_fn.__code__.co_code
+
+
 def test_should_route_count():
     event = {
         "path": "/my_test_cohort/fhir/patient/count",
@@ -118,16 +147,23 @@ def test_validate_query_params(data):
 
 
 @pytest.mark.parametrize(
-    "event, cohort_id, resource, fields, patients, offset, limit",
+    "event, cohort_id, resource, fields, patients, offset, limit, patient_id",
     [
         (
-            {"pathParameters": {"cohort_id": "foo", "fhir_resource": "patient"}},
+            {
+                "pathParameters": {
+                    "cohort_id": "foo",
+                    "fhir_resource": "patient",
+                    "patient_id": "Frank",
+                }
+            },
             "foo",
             "patient",
             [],
             [],
             0,
             50,
+            "Frank",
         ),
         (
             {"pathParameters": {"cohort_id": "foo", "fhir_resource": "Patient"}},
@@ -137,6 +173,7 @@ def test_validate_query_params(data):
             [],
             0,
             50,
+            None,
         ),
         (
             {
@@ -146,9 +183,10 @@ def test_validate_query_params(data):
             "foo",
             "encounter",
             [],
-            ["Patient/id_1", "Patient/id_2"],
+            ["id_1", "id_2"],
             0,
             50,
+            None,
         ),
         (
             {
@@ -161,16 +199,18 @@ def test_validate_query_params(data):
             ["id_1", "id_2"],
             0,
             50,
+            None,
         ),
     ],
 )
-def test_extract_params(event, cohort_id, resource, fields, patients, offset, limit):
-    a_cohort_id, a_resource, a_fields, a_patients, a_offset, a_limit = (
-        lambda_fn.extract_params(event)
-    )
-    assert a_cohort_id == cohort_id
-    assert a_resource == resource
-    assert a_fields == fields
-    assert a_patients == patients
-    assert a_offset == offset
-    assert a_limit == limit
+def test_extract_params(
+    event, cohort_id, resource, fields, patients, offset, limit, patient_id
+):
+    request_params = lambda_fn.extract_params(event)
+    assert request_params.cohort_id == cohort_id
+    assert request_params.resource == resource
+    assert request_params.fields == fields
+    assert request_params.patients == patients
+    assert request_params.offset == offset
+    assert request_params.limit == limit
+    assert request_params.patient_id == patient_id

@@ -107,4 +107,4 @@ def get_fhir_resource_types(cohort_id: str) -> list[str]:
     if env.uses_s3():
         return list_s3_subdirectories(env.source_bucket, cohort_id)
     else:
-        return os.listdir(env.local_root)
+        return os.listdir(env.local_root / cohort_id)
