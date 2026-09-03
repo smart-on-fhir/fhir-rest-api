@@ -38,50 +38,70 @@ def lambda_handler(event, context):
     logger.info("Done :)")
 
 
-def batch_into_fhir_types(event) -> tuple[dict[str, ConversionBatch], str]:
+def batch_into_fhir_types(event) -> tuple[dict[str, ConversionBatch], str | None]:
     ndjsons: dict[str, ConversionBatch] = {}
-    bucket = ""
+    bucket = None
     for sqs_record in event["Records"]:
         s3_event = json.loads(sqs_record["body"])
-        for s3_record in s3_event["Records"]:
-            # these events are tied to a single bucket, so this should remain constant
-            bucket = s3_record["s3"]["bucket"]["name"]
-            key = s3_record["s3"]["object"]["key"]
-            key = parse.unquote_plus(key)
-            # key will always be study/fhir_type/filename.ndjson
-            parts = pathlib.Path(key).parts
-            resource = parts[1]
-            ndjson_path = "s3://" + os.path.join(
-                *(bucket,) + parts[:-1] + ("*.ndjson",)
-            )
-            parquet_dest = "s3://" + os.path.join(
-                *(bucket,) + parts[:-1] + (f"{resource}_compacted.parquet",)
-            )
-            delete_prefix = os.path.join(*parts[:-1])
+        for record in s3_event["Records"]:
+            if "s3" in record:
+                bucket = record["s3"]["bucket"]["name"]
+                key = record["s3"]["object"]["key"]
+                key = parse.unquote_plus(key)
+                # key will always be study/fhir_type/filename.ndjson
+                parts = pathlib.Path(key).parts
+                resource = parts[1]
+                ndjson_path = "s3://" + os.path.join(
+                    *(bucket,) + parts[:-1] + ("*.ndjson",)
+                )
+                parquet_dest = "s3://" + os.path.join(
+                    *(bucket,) + parts[:-1] + (f"{resource}_compacted.parquet",)
+                )
+                delete_prefix = os.path.join(*parts[:-1])
+            else:
+                local_path: str = record["local_path"]
+                parts = pathlib.Path(local_path).parts
+                resource = parts[-1]
+                if local_path.endswith("*.ndjson"):
+                    ndjson_path = local_path
+                    parquet_dest = ndjson_path.replace(
+                        "*.ndjson", f"{resource}_compacted.parquet"
+                    )
+                else:
+                    ndjson_path = os.path.join(*parts[:-1] + ("*.ndjson",))
+                    parquet_dest = os.path.join(
+                        *parts[:-1] + (f"{resource}_compacted.parquet",)
+                    )
+                delete_prefix = os.path.join(*parts[:-1])
             ndjsons[resource] = ConversionBatch(
                 ndjson_path, parquet_dest, delete_prefix
             )
     return ndjsons, bucket
 
 
-def delete_matching(bucket_name, prefix, suffix=".ndjson"):
-    logger.info(f"Deleting ndjsons from bucket with prefix {prefix}..")
-    paginator = s3.get_paginator("list_objects_v2")
-    deleted = 0
+def delete_matching(bucket_name: str | None, prefix: str, suffix=".ndjson"):
+    if bucket_name is None:
+        for item in pathlib.Path(prefix).iterdir():
+            if item.is_file() and item.name.endswith(suffix):
+                item.unlink()
+    else:
+        logger.info(f"Deleting ndjsons from bucket with prefix {prefix}..")
+        paginator = s3.get_paginator("list_objects_v2")
+        deleted = 0
 
-    for page in paginator.paginate(Bucket=bucket_name, Prefix=prefix):
-        keys = [
-            {"Key": obj["Key"]}
-            for obj in page.get("Contents", [])
-            if obj["Key"].endswith(suffix)
-        ]
-        if not keys:
-            continue
-        resp = s3.delete_objects(Bucket=bucket_name, Delete={"Objects": keys})
-        deleted += len(resp.get("Deleted", []))
-        if "Errors" in resp:
-            print("Failed to delete:", resp["Errors"])
-    logger.info(f"Deleted {deleted} files")
+        for page in paginator.paginate(Bucket=bucket_name, Prefix=prefix):
+            keys = [
+                {"Key": obj["Key"]}
+                for obj in page.get("Contents", [])
+                if obj["Key"].endswith(suffix)
+            ]
+            if not keys:
+                continue
+            resp = s3.delete_objects(Bucket=bucket_name, Delete={"Objects": keys})
+            deleted += len(resp.get("Deleted", []))
+            if "Errors" in resp:
+                print("Failed to delete:", resp["Errors"])
+        logger.info(f"Deleted {deleted} files")
 
 
 def convert_json(source: str, destination: str, con: duckdb.DuckDBPyConnection):

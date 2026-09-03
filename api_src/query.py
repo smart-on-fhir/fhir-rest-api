@@ -15,6 +15,21 @@ template_env = Environment(
 )
 
 con = duckdb.connect(":memory:")
+NON_PATIENT_RESOURCES = [
+    "practitioner",
+    "organization",
+    "medication",
+    "location",
+    "practitionerrole",
+]
+
+
+def filter_and_format_patients_for_resource(resource: str, patients: list[str]):
+    if resource.lower() in NON_PATIENT_RESOURCES:
+        return []
+    if resource != "patient":
+        return [f"Patient/{p}" for p in patients] if patients else []
+    return patients
 
 
 def get_fhir_data(
@@ -26,12 +41,14 @@ def get_fhir_data(
     limit: int,
 ):
     logger.info("Setting up query")
+    patients = filter_and_format_patients_for_resource(resource, patients)
     parquet_pattern = os.path.join(env.local_root, cohort_id, resource, "*")
     template = template_env.get_template("fhir_query.sql.jinja2")
     query = template.render(
         has_fields=bool(fields),
         has_patients=bool(patients),
         patient_path=get_patient_path(resource),
+        fhir_type=resource.lower(),
     )
     if fields and patients:
         logger.info("Fetching data, filtering fields and patients")
@@ -60,11 +77,13 @@ def to_dict(row: tuple, column_names: list[str]):
 
 def get_fhir_count(resource: str, cohort_id: str, patients: list[str]) -> int:
     parquet_pattern = os.path.join(env.local_root, cohort_id, resource, "*")
+    patients = filter_and_format_patients_for_resource(resource, patients)
 
     template = template_env.get_template("fhir_count.sql.jinja2")
     query = template.render(
         has_patients=bool(patients),
         patient_path=get_patient_path(resource),
+        fhir_type=resource.lower(),
     )
 
     if patients:

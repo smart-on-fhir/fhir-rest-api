@@ -109,6 +109,18 @@ Resources:
             RestApiId: !Ref FhirApi
             Path: /{cohort_id}/fhir/{fhir_resource}/count
             Method: POST
+        FhirPatientRoute:
+          Type: Api
+          Properties:
+            RestApiId: !Ref FhirApi
+            Path: /{cohort_id}/fhir/patient/{patient_id}
+            Method: POST
+        FhirResourcesRoute:
+          Type: Api
+          Properties:
+            RestApiId: !Ref FhirApi
+            Path: /{cohort_id}/fhir/resources
+            Method: GET
 
   ConverterFunction:
     Type: AWS::Serverless::Function

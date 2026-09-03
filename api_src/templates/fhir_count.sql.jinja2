@@ -1,7 +1,14 @@
 {% if has_patients -%}
 SELECT count(*)
 FROM read_parquet($1)
+{% if fhir_type == "appointment" -%}
+WHERE list_has_any(
+    list_transform(participant, p -> p.actor.reference),
+    $2
+);
+{% else -%}
 WHERE list_contains($2, {{ patient_path }})
+{% endif %}
 {% else -%}
 SELECT count(*)
 FROM read_parquet($1)

@@ -32,7 +32,7 @@ Run query:
 
 ```bash
 LOCAL_ROOT=/path/to/my/fhir_root/ python3 lambda/lambda.py --fhir_resource patient \
-  --body '{"patients": ["Patient/1"]}' \
+  --body '{"patients": ["my-patient-id"]}' \
   --offset 0 --limit 50
 ```
 
@@ -86,7 +86,7 @@ curl -X POST http://127.0.0.1:5000/fhir/patient/count \
 ```bash
 curl -X POST http://127.0.0.1:5000/fhir/observation/ \
   -H "Content-Type: application/json" \
-  -d '{"patients": ["Patient/1", "Patient/2"]}'
+  -d '{"patients": ["my-patient-id", "my-patient-id-2"]}'
 ```
 
 #### 2.2. Count
@@ -94,7 +94,7 @@ curl -X POST http://127.0.0.1:5000/fhir/observation/ \
 ```bash
 curl -X POST http://127.0.0.1:5000/fhir/observation/count \
   -H "Content-Type: application/json" \
-  -d '{"patients": ["Patient/1", "Patient/2"]}'
+  -d '{"patients": ["my-patient-id", "my-patient-id-2"]}'
 ```
 
 ### 3. Request a resource type and filter returned fields
@@ -102,7 +102,7 @@ curl -X POST http://127.0.0.1:5000/fhir/observation/count \
 ```bash
 curl -X POST http://127.0.0.1:5000/fhir/encounter/ \
   -H "Content-Type: application/json" \
-  -d '{"patients": ["Patient/1"], "fields": ["id", "status", "code"]}'
+  -d '{"patients": ["my-patient-id"], "fields": ["id", "status", "code"]}'
 ```
 
 ### 4. Request a paginated page of results
@@ -110,6 +110,18 @@ curl -X POST http://127.0.0.1:5000/fhir/encounter/ \
 ```bash
 curl -X POST 'http://127.0.0.1:5000/fhir/condition/?offset=10&limit=5' \
   -H "Content-Type: application/json" \
-  -d '{"patients": ["Patient/1"]}'
+  -d '{"patients": ["my-patient-id"]}'
 ```
 
+### 5. View available FHIR resources
+
+```bash
+curl 'http://127.0.0.1:5000/fhir/resources'
+```
+
+### 6. View all the FHIR data for a specific patient
+```bash
+curl -X POST 'http://127.0.0.1:5000/fhir/patient/my-patient-id' \
+  -H "Content-Type: application/json" \
+  -d '{"fields": ["id"]}'
+```
