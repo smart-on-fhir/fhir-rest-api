@@ -61,12 +61,14 @@ This repo consists of a SAM template that deploys a lambda backed REST API, and 
 
 ## Usage
 
+These requests are for a cohort named `example_cohort`.
+
 ### 1. Request a resource type
 
 #### 1.1. FHIR
 
 ```bash
-curl -X POST http://127.0.0.1:5000/fhir/patient/ \
+curl -X POST http://127.0.0.1:5000/example_cohort/fhir/patient/ \
   -H "Content-Type: application/json" \
   -d '{}'
 ```
@@ -74,7 +76,7 @@ curl -X POST http://127.0.0.1:5000/fhir/patient/ \
 #### 1.2. Count
 
 ```bash
-curl -X POST http://127.0.0.1:5000/fhir/patient/count \
+curl -X POST http://127.0.0.1:5000/example_cohort/fhir/patient/count \
   -H "Content-Type: application/json" \
   -d '{}'
 ```
@@ -84,7 +86,7 @@ curl -X POST http://127.0.0.1:5000/fhir/patient/count \
 #### 2.1. FHIR
 
 ```bash
-curl -X POST http://127.0.0.1:5000/fhir/observation/ \
+curl -X POST http://127.0.0.1:5000/example_cohort/fhir/observation/ \
   -H "Content-Type: application/json" \
   -d '{"patients": ["my-patient-id", "my-patient-id-2"]}'
 ```
@@ -92,7 +94,7 @@ curl -X POST http://127.0.0.1:5000/fhir/observation/ \
 #### 2.2. Count
 
 ```bash
-curl -X POST http://127.0.0.1:5000/fhir/observation/count \
+curl -X POST http://127.0.0.1:5000/example_cohort/fhir/observation/count \
   -H "Content-Type: application/json" \
   -d '{"patients": ["my-patient-id", "my-patient-id-2"]}'
 ```
@@ -100,7 +102,7 @@ curl -X POST http://127.0.0.1:5000/fhir/observation/count \
 ### 3. Request a resource type and filter returned fields
 
 ```bash
-curl -X POST http://127.0.0.1:5000/fhir/encounter/ \
+curl -X POST http://127.0.0.1:5000/example_cohort/fhir/encounter/ \
   -H "Content-Type: application/json" \
   -d '{"patients": ["my-patient-id"], "fields": ["id", "status", "code"]}'
 ```
@@ -108,7 +110,7 @@ curl -X POST http://127.0.0.1:5000/fhir/encounter/ \
 ### 4. Request a paginated page of results
 
 ```bash
-curl -X POST 'http://127.0.0.1:5000/fhir/condition/?offset=10&limit=5' \
+curl -X POST 'http://127.0.0.1:5000/example_cohort/fhir/condition/?offset=10&limit=5' \
   -H "Content-Type: application/json" \
   -d '{"patients": ["my-patient-id"]}'
 ```
@@ -116,12 +118,12 @@ curl -X POST 'http://127.0.0.1:5000/fhir/condition/?offset=10&limit=5' \
 ### 5. View available FHIR resources
 
 ```bash
-curl 'http://127.0.0.1:5000/fhir/resources'
+curl 'http://127.0.0.1:5000/example_cohort/fhir/resources'
 ```
 
 ### 6. View all the FHIR data for a specific patient
 ```bash
-curl -X POST 'http://127.0.0.1:5000/fhir/patient/my-patient-id' \
+curl -X POST 'http://127.0.0.1:5000/example_cohort/fhir/patient/my-patient-id' \
   -H "Content-Type: application/json" \
   -d '{"fields": ["id"]}'
 ```
