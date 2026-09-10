@@ -16,8 +16,16 @@ ALLOWED_PARAMS = {"offset", "limit"}
 
 
 def lambda_handler(event, context):
-    return determine_route(event)(event)
-
+    res= determine_route(event)(event)
+    
+    # Set CORS return params
+    cors_headers = { 
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, GET'
+    }
+    res['headers'] = {**res.get("headers",{}), **cors_headers}
+    return res
 
 def run_count_query(event) -> dict:
     request_params = extract_params(event)
