@@ -8,6 +8,17 @@ from api_src import lambda_fn as api_lambda_fn
 from convert_src import lambda_fn as convert_lambda_fn
 
 
+def validate_cors(response):
+    expected = {
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, GET",
+    }
+    for k, v in expected.items():
+        headers = response.get("headers", {})
+        assert headers.get(k, "") == v
+
+
 @pytest.mark.parametrize(
     "fhir_type, expected_count",
     [
@@ -55,7 +66,7 @@ def test_convert_data_and_query(fhir_type, expected_count, tmp_path, monkeypatch
     monkeypatch.setattr(api_lambda_fn.env, "local_root", tmp_path)
     response = api_lambda_fn.lambda_handler(event, None)
     assert response["body"] == expected_count
-
+    validate_cors(response)
     event = {
         "pathParameters": {"fhir_resource": fhir_type, "cohort_id": "my_cohort"},
         "queryStringParameters": {},
@@ -64,6 +75,7 @@ def test_convert_data_and_query(fhir_type, expected_count, tmp_path, monkeypatch
     }
     response = api_lambda_fn.lambda_handler(event, None)
     assert response["statusCode"] == 200
+    validate_cors(response)
 
 
 def test_convert_data_and_query_patient(tmp_path, monkeypatch):
@@ -92,3 +104,4 @@ def test_convert_data_and_query_patient(tmp_path, monkeypatch):
     monkeypatch.setattr(api_lambda_fn.env, "local_root", tmp_path)
     response = api_lambda_fn.lambda_handler(event, None)
     assert response["statusCode"] == 200
+    validate_cors(response)

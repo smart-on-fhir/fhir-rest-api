@@ -71,6 +71,12 @@ Resources:
       MethodSettings:
         - ResourcePath: '/*'
           HttpMethod: '*'
+      Cors:
+        AllowMethods: "'POST, GET'"
+        AllowHeaders: "'X-Forwarded-For'"
+        AllowOrigin: "'*'"
+        MaxAge: "'600'"
+        AllowCredentials: true
 
   FhirFunction:
     Type: AWS::Serverless::Function
