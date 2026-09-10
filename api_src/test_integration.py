@@ -10,13 +10,14 @@ from convert_src import lambda_fn as convert_lambda_fn
 
 def validate_cors(response):
     expected = {
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, GET'
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, GET",
     }
-    for k,v in expected.items():
-        headers = response.get('headers',{})
-        assert headers.get(k, '') == v
+    for k, v in expected.items():
+        headers = response.get("headers", {})
+        assert headers.get(k, "") == v
+
 
 @pytest.mark.parametrize(
     "fhir_type, expected_count",
