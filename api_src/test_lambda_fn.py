@@ -5,7 +5,7 @@ from api_src import lambda_fn
 
 def test_route_resources():
     event = {
-        "path": "/my_test_cohort/fhir/resources",
+        "path": "/fhir/my_test_cohort/resources",
         "pathParameters": {
             "fhir_resource": "resources",
             "cohort_id": "my_test_cohort",
@@ -19,7 +19,7 @@ def test_route_resources():
 
 def test_route_patient():
     event = {
-        "path": "/my_test_cohort/fhir/patient/patient_id_1",
+        "path": "/fhir/my_test_cohort/patient/patient_id_1",
         "pathParameters": {
             "fhir_resource": "patient",
             "cohort_id": "my_test_cohort",
@@ -34,7 +34,7 @@ def test_route_patient():
 
 def test_should_route_count():
     event = {
-        "path": "/my_test_cohort/fhir/patient/count",
+        "path": "/fhir/my_test_cohort/patient/count",
         "pathParameters": {
             "fhir_resource": "patient",
             "cohort_id": "my_test_cohort",
@@ -52,7 +52,7 @@ def test_should_route_count():
     [
         (
             {
-                "path": "/my_test_cohort/fhir/patient",
+                "path": "/fhir/my_test_cohort/patient",
                 "pathParameters": {
                     "fhir_resource": "patient",
                     "cohort_id": "my_test_cohort",
@@ -62,7 +62,7 @@ def test_should_route_count():
         ),
         (
             {
-                "path": "/my_test_cohort/fhir/Patient",
+                "path": "/fhir/my_test_cohort/Patient",
                 "pathParameters": {
                     "fhir_resource": "Patient",
                     "cohort_id": "my_test_cohort",
@@ -72,7 +72,7 @@ def test_should_route_count():
         ),
         (
             {
-                "path": "/my_test_cohort/fhir/patient/count",
+                "path": "/fhir/my_test_cohort/patient/count",
                 "pathParameters": {
                     "fhir_resource": "patient",
                     "cohort_id": "my_test_cohort",
@@ -82,7 +82,7 @@ def test_should_route_count():
         ),
         (
             {
-                "path": "/my_test_cohort/fhir/Patient/count",
+                "path": "/fhir/my_test_cohort/Patient/count",
                 "pathParameters": {
                     "fhir_resource": "Patient",
                     "cohort_id": "my_test_cohort",
