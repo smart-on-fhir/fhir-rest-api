@@ -76,7 +76,6 @@ Resources:
         AllowHeaders: "'X-Forwarded-For'"
         AllowOrigin: "'*'"
         MaxAge: "'600'"
-        AllowCredentials: true
 
   FhirFunction:
     Type: AWS::Serverless::Function
@@ -85,7 +84,7 @@ Resources:
       Runtime: python3.14
       Handler: lambda_fn.lambda_handler
       CodeUri: api_src/
-      MemorySize: 3600 # This should get us 2 cores
+      MemorySize: 8192 
       EphemeralStorage:
         Size: 10240
       Timeout: 30
@@ -107,25 +106,25 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref FhirApi
-            Path: /{cohort_id}/fhir/{fhir_resource}
+            Path: /fhir/{cohort_id}/{fhir_resource}
             Method: POST
         FhirCountRoute:
           Type: Api
           Properties:
             RestApiId: !Ref FhirApi
-            Path: /{cohort_id}/fhir/{fhir_resource}/count
+            Path: /fhir/{cohort_id}/{fhir_resource}/count
             Method: POST
         FhirPatientRoute:
           Type: Api
           Properties:
             RestApiId: !Ref FhirApi
-            Path: /{cohort_id}/fhir/patient/{patient_id}
+            Path: /fhir/{cohort_id}/patient/{patient_id}
             Method: POST
         FhirResourcesRoute:
           Type: Api
           Properties:
             RestApiId: !Ref FhirApi
-            Path: /{cohort_id}/fhir/resources
+            Path: /fhir/{cohort_id}/resources
             Method: GET
 
   ConverterFunction:

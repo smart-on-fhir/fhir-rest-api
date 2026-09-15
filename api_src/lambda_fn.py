@@ -16,14 +16,15 @@ ALLOWED_PARAMS = {"offset", "limit"}
 
 
 def lambda_handler(event, context):
-    res = determine_route(event)(event)
-
-    # Set CORS return params
     cors_headers = {
         "Access-Control-Allow-Headers": "Content-Type",
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "POST, GET",
     }
+    if event.get("httpMethod") == "OPTIONS":
+        return {"statusCode": 200, "headers": cors_headers}
+    res = determine_route(event)(event)
+
     res["headers"] = {**res.get("headers", {}), **cors_headers}
     return res
 
@@ -176,10 +177,10 @@ def determine_route(event):
         route = event.get("path").replace(uncased_resource, request_params.resource)
     else:
         route = event.get("path")
-    base_route = f"/{request_params.cohort_id}/fhir/{request_params.resource}"
+    base_route = f"/fhir/{request_params.cohort_id}/{request_params.resource}"
     if request_params.patient_id:
         return run_patient_query
-    if route == f"/{request_params.cohort_id}/fhir/resources":
+    if route == f"/fhir/{request_params.cohort_id}/resources":
         return run_resource_query
     if route in [f"{base_route}/count", f"{base_route}/count/"]:
         return run_count_query

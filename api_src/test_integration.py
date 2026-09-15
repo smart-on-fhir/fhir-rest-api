@@ -61,7 +61,7 @@ def test_convert_data_and_query(fhir_type, expected_count, tmp_path, monkeypatch
         "pathParameters": {"fhir_resource": fhir_type, "cohort_id": "my_cohort"},
         "queryStringParameters": {},
         "body": '{"patients": ["Alden-Chong-Murphy"]}',
-        "path": f"/my_cohort/fhir/{fhir_type}/count",
+        "path": f"/fhir/my_cohort/{fhir_type}/count",
     }
     monkeypatch.setattr(api_lambda_fn.env, "local_root", tmp_path)
     response = api_lambda_fn.lambda_handler(event, None)
@@ -71,7 +71,7 @@ def test_convert_data_and_query(fhir_type, expected_count, tmp_path, monkeypatch
         "pathParameters": {"fhir_resource": fhir_type, "cohort_id": "my_cohort"},
         "queryStringParameters": {},
         "body": '{"patients": ["Alden-Chong-Murphy"]}',
-        "path": f"/my_cohort/fhir/{fhir_type}",
+        "path": f"/fhir/my_cohort/{fhir_type}",
     }
     response = api_lambda_fn.lambda_handler(event, None)
     assert response["statusCode"] == 200
@@ -99,7 +99,7 @@ def test_convert_data_and_query_patient(tmp_path, monkeypatch):
             "patient_id": "Alden-Chong-Murphy",
         },
         "queryStringParameters": {},
-        "path": "/my_cohort/fhir/patient/Alden-Chong-Murphy",
+        "path": "/fhir/my_cohort/patient/Alden-Chong-Murphy",
     }
     monkeypatch.setattr(api_lambda_fn.env, "local_root", tmp_path)
     response = api_lambda_fn.lambda_handler(event, None)
