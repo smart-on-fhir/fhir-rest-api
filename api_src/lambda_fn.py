@@ -61,7 +61,7 @@ def run_count_query(event) -> dict:
 
 
 def _json_type_check(obj):
-    if isinstance(obj, datetime.datetime):
+    if isinstance(obj, datetime.datetime | datetime.date):
         return obj.isoformat()
     if isinstance(obj, uuid.UUID):
         return str(obj)
@@ -195,7 +195,7 @@ def validate_query_params(event) -> bool:
 
 @dataclasses.dataclass
 class RequestParams:
-    cohort_id: str | None
+    cohort_id: str
     resource: str
     fields: list[str]
     patients: list[str]
