@@ -118,7 +118,7 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref FhirApi
-            Path: /fhir/{cohort_id}/patient
+            Path: /fhir/{cohort_id}/patient-details
             Method: POST
         FhirResourcesRoute:
           Type: Api
