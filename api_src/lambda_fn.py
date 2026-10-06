@@ -186,7 +186,8 @@ def determine_route(event):
         return run_count_query
     if route in [f"{base_route}", f"{base_route}/"]:
         return run_fhir_query
-    return lambda e: {"statusCode": "404", "body": "Route not found"}
+    logger.warning(f"Error parsing route. {event=}")
+    return lambda e: {"statusCode": "404", "body": f"Route not found: {route}"}
 
 
 def validate_query_params(event) -> bool:

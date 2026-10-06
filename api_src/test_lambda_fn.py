@@ -58,7 +58,7 @@ def test_should_route_count():
                     "cohort_id": "my_test_cohort",
                 },
             },
-            "fhir",
+            lambda_fn.run_fhir_query,
         ),
         (
             {
@@ -68,7 +68,28 @@ def test_should_route_count():
                     "cohort_id": "my_test_cohort",
                 },
             },
-            "fhir",
+            lambda_fn.run_fhir_query,
+        ),
+        (  # noqa: PT014
+            # This is checking case sensitivity. Not a dup test
+            {
+                "path": "/fhir/my_test_cohort/patient",
+                "pathParameters": {
+                    "fhir_resource": "patient",
+                    "cohort_id": "my_test_cohort",
+                },
+            },
+            lambda_fn.run_fhir_query,
+        ),
+        (
+            {
+                "path": "/fhir/my_test_cohort/patient-details",
+                "pathParameters": {
+                    "cohort_id": "my_test_cohort",
+                },
+                "body": '{"patient_id": "Frank"}',
+            },
+            lambda_fn.run_patient_query,
         ),
         (
             {
@@ -94,24 +115,23 @@ def test_should_route_count():
 )
 def test_should_route_fhir(event, expected_fn):
     actual_fn = lambda_fn.determine_route(event)
-    expected_fn = (
-        lambda_fn.run_fhir_query if expected_fn == "fhir" else lambda_fn.run_count_query
-    )
-
     # This compares the bytecode of the function bodies
     assert actual_fn.__code__.co_code == expected_fn.__code__.co_code
 
 
 def test_should_route_404():
     event = {
-        "path": "/my_test_cohort/narnia/patient",
+        "path": "/my_test_cohort/narnia/patient-detail",
         "pathParameters": {
             "fhir_resource": "patient",
             "cohort_id": "my_test_cohort",
         },
     }
     actual_body = lambda_fn.determine_route(event)(event)
-    expected_body = {"statusCode": "404", "body": "Route not found"}
+    expected_body = {
+        "statusCode": "404",
+        "body": "Route not found: /my_test_cohort/narnia/patient-detail",
+    }
 
     # The 404 function is a lambda, so we compare function outputs instead
     assert actual_body == expected_body
