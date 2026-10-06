@@ -206,14 +206,15 @@ class RequestParams:
 
 def extract_params(event) -> RequestParams:
     resource = event.get("pathParameters").get("fhir_resource", "").lower()
-    patient_id = event.get("pathParameters").get("patient_id", None)
     cohort_id = event.get("pathParameters").get("cohort_id")
     fields = []
     patients = []
     offset = 0
     limit = 50
+    patient_id = None
     if event.get("body"):
         body = json.loads(event.get("body"))
+        patient_id = body.get("patient_id", None)
         fields = body.get("fields", [])
         patients = body.get("patients", [])
     if event.get("queryStringParameters"):
