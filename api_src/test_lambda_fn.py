@@ -19,12 +19,12 @@ def test_route_resources():
 
 def test_route_patient():
     event = {
-        "path": "/fhir/my_test_cohort/patient/patient_id_1",
+        "path": "/fhir/my_test_cohort/patient",
         "pathParameters": {
             "fhir_resource": "patient",
             "cohort_id": "my_test_cohort",
-            "patient_id": "patient_id_1",
         },
+        "body": '{"patient_id": "patient_id_1"}',
     }
     actual_fn = lambda_fn.determine_route(event)
     expected_fn = lambda_fn.run_patient_query
@@ -154,8 +154,8 @@ def test_validate_query_params(data):
                 "pathParameters": {
                     "cohort_id": "foo",
                     "fhir_resource": "patient",
-                    "patient_id": "Frank",
-                }
+                },
+                "body": '{"patient_id": "Frank"}',
             },
             "foo",
             "patient",

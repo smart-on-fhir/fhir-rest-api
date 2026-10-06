@@ -91,15 +91,14 @@ def test_convert_data_and_query_patient(tmp_path, monkeypatch):
             )
         convert_event = {"Records": [{"body": json.dumps({"Records": records})}]}
         convert_lambda_fn.lambda_handler(convert_event, None)
-    fhir_type = "patient"
 
     event = {
         "pathParameters": {
             "cohort_id": "my_cohort",
-            "patient_id": "Alden-Chong-Murphy",
         },
         "queryStringParameters": {},
-        "path": "/fhir/my_cohort/patient/Alden-Chong-Murphy",
+        "path": "/fhir/my_cohort/patient",
+        "body": '{"patient_id": "Alden-Chong-Murphy"}',
     }
     monkeypatch.setattr(api_lambda_fn.env, "local_root", tmp_path)
     response = api_lambda_fn.lambda_handler(event, None)

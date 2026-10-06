@@ -123,7 +123,7 @@ curl 'http://127.0.0.1:5000/example_cohort/fhir/resources'
 
 ### 6. View all the FHIR data for a specific patient
 ```bash
-curl -X POST 'http://127.0.0.1:5000/example_cohort/fhir/patient/my-patient-id' \
+curl -X POST 'http://127.0.0.1:5000/example_cohort/fhir/patient' \
   -H "Content-Type: application/json" \
-  -d '{"fields": ["id"]}'
+  -d '{"fields": ["id"], "patient_id": "my-patient-id"}'
 ```
