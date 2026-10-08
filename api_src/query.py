@@ -104,7 +104,7 @@ def get_patient_path(resource: str) -> str:
         "encounter": "subject.reference",
         "episodeofcare": "patient.reference",
         "immunization": "patient.reference",
-        "medicationdispense": "patient.reference",
+        "medicationdispense": "subject.reference",
         "medicationrequest": "subject.reference",
         "patient": "id",
     }
