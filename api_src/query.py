@@ -42,7 +42,7 @@ def get_fhir_data(
 ):
     logger.info("Setting up query")
     patients = filter_and_format_patients_for_resource(resource, patients)
-    parquet_pattern = os.path.join(env.local_root, cohort_id, resource, "*")
+    parquet_pattern = os.path.join(env.local_root, cohort_id, resource, "*.parquet")
     template = template_env.get_template("fhir_query.sql.jinja2")
     query = template.render(
         has_fields=bool(fields),
@@ -76,7 +76,7 @@ def to_dict(row: tuple, column_names: list[str]):
 
 
 def get_fhir_count(resource: str, cohort_id: str, patients: list[str]) -> int:
-    parquet_pattern = os.path.join(env.local_root, cohort_id, resource, "*")
+    parquet_pattern = os.path.join(env.local_root, cohort_id, resource, "*.parquet")
     patients = filter_and_format_patients_for_resource(resource, patients)
 
     template = template_env.get_template("fhir_count.sql.jinja2")

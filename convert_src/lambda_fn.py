@@ -34,7 +34,7 @@ def lambda_handler(event, context):
             con = duckdb.connect(":memory:")
             logger.info("No s3 detected in src/dest, using local db")
         convert_json(batch.src, batch.dest, con)
-        delete_matching(bucket_name, batch.delete_prefix)
+        move_matching(bucket_name, batch.delete_prefix)
     logger.info("Done :)")
 
 
@@ -79,29 +79,38 @@ def batch_into_fhir_types(event) -> tuple[dict[str, ConversionBatch], str | None
     return ndjsons, bucket
 
 
-def delete_matching(bucket_name: str | None, prefix: str, suffix=".ndjson"):
+def move_matching(
+    bucket_name: str | None, prefix: str, suffix=".ndjson", destination="raw"
+):
     if bucket_name is None:
+        destination_path = pathlib.Path(prefix) / destination
+        destination_path.mkdir(parents=True, exist_ok=True)
         for item in pathlib.Path(prefix).iterdir():
             if item.is_file() and item.name.endswith(suffix):
-                item.unlink()
+                item.rename(destination_path / item.name)
     else:
-        logger.info(f"Deleting ndjsons from bucket with prefix {prefix}..")
+        logger.info(f"Moving ndjsons from bucket with prefix {prefix}..")
         paginator = s3.get_paginator("list_objects_v2")
-        deleted = 0
+        moved = 0
+        destination_prefix = f"{prefix.rstrip('/')}/{destination}/"
 
         for page in paginator.paginate(Bucket=bucket_name, Prefix=prefix):
-            keys = [
-                {"Key": obj["Key"]}
-                for obj in page.get("Contents", [])
-                if obj["Key"].endswith(suffix)
-            ]
-            if not keys:
-                continue
-            resp = s3.delete_objects(Bucket=bucket_name, Delete={"Objects": keys})
-            deleted += len(resp.get("Deleted", []))
-            if "Errors" in resp:
-                print("Failed to delete:", resp["Errors"])
-        logger.info(f"Deleted {deleted} files")
+            for obj in page.get("Contents", []):
+                source_key = obj["Key"]
+                if not source_key.endswith(suffix) or source_key.startswith(
+                    destination_prefix
+                ):
+                    continue
+                relative_key = source_key[len(prefix) :].lstrip("/")
+                destination_key = f"{destination_prefix}{relative_key}"
+                s3.copy_object(
+                    Bucket=bucket_name,
+                    CopySource={"Bucket": bucket_name, "Key": source_key},
+                    Key=destination_key,
+                )
+                s3.delete_object(Bucket=bucket_name, Key=source_key)
+                moved += 1
+        logger.info(f"Moved {moved} files")
 
 
 def convert_json(source: str, destination: str, con: duckdb.DuckDBPyConnection):
