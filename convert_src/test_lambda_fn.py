@@ -1,6 +1,7 @@
 import boto3
 import duckdb
 import moto
+import pytest
 from moto.moto_server import threaded_moto_server
 
 from convert_src import lambda_fn
@@ -42,6 +43,15 @@ def test_convert_from_sqs_queue(tmp_path):
     lambda_fn.s3 = s3
     lambda_fn.create_s3_based_db_con = create_s3_based_db_con
     lambda_fn.lambda_handler(sqs_message, {})
+    for ndjson in ndjsons:
+        key = ndjson.replace("test_data/", "")
+        prefix, filename = key.rsplit("/", 1)
+        s3.head_object(
+            Bucket=bucket_name,
+            Key=f"{prefix}/raw/{filename}",
+        )
+        with pytest.raises(s3.exceptions.ClientError):
+            s3.head_object(Bucket=bucket_name, Key=key)
     s3.download_file(
         bucket_name,
         "my_json_cohort/encounter/encounter_compacted.parquet",
