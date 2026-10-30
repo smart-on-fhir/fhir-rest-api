@@ -50,6 +50,10 @@ def batch_into_fhir_types(event) -> tuple[dict[str, ConversionBatch], str | None
                 key = parse.unquote_plus(key)
                 # key will always be study/fhir_type/filename.ndjson
                 parts = pathlib.Path(key).parts
+                # avoid recursion: ignore raw
+                if parts[-2] == "raw":
+                    logger.debug(f"Skipping raw file {key}")
+                    continue
                 resource = parts[1]
                 ndjson_path = "s3://" + os.path.join(
                     *(bucket,) + parts[:-1] + ("*.ndjson",)
@@ -61,6 +65,9 @@ def batch_into_fhir_types(event) -> tuple[dict[str, ConversionBatch], str | None
             else:
                 local_path: str = record["local_path"]
                 parts = pathlib.Path(local_path).parts
+                if parts[-2] == "raw":
+                    logger.debug(f"Skipping raw file {local_path}")
+                    continue
                 resource = parts[-1]
                 if local_path.endswith("*.ndjson"):
                     ndjson_path = local_path

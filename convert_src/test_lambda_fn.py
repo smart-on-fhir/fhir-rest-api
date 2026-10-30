@@ -1,3 +1,5 @@
+import json
+
 import boto3
 import duckdb
 import moto
@@ -17,6 +19,102 @@ server.start()
 def with_key(key: str) -> dict:
     s3_object = '{"Records":[{"s3":{"bucket":{"name":"fake_bucket"},"object":{"key":"__KEY__"}}}]}'
     return {"body": s3_object.replace("__KEY__", key)}
+
+
+def with_local_path(local_path: str) -> dict:
+    return {"body": json.dumps({"Records": [{"local_path": local_path}]})}
+
+
+def test_batch_into_fhir_types_with_no_records():
+    batches, bucket_name = lambda_fn.batch_into_fhir_types({"Records": []})
+
+    assert batches == {}
+    assert bucket_name is None
+
+
+def test_batch_into_fhir_types_groups_s3_files_by_resource():
+    event = {
+        "Records": [
+            with_key("my_json_cohort/patient/Patient.000.ndjson"),
+            with_key("my_json_cohort/patient/Patient.001.ndjson"),
+            with_key("my_json_cohort/encounter/Encounter.000.ndjson"),
+        ]
+    }
+
+    batches, bucket_name = lambda_fn.batch_into_fhir_types(event)
+
+    assert bucket_name == "fake_bucket"
+    assert batches == {
+        "patient": lambda_fn.ConversionBatch(
+            src="s3://fake_bucket/my_json_cohort/patient/*.ndjson",
+            dest="s3://fake_bucket/my_json_cohort/patient/patient_compacted.parquet",
+            delete_prefix="my_json_cohort/patient",
+        ),
+        "encounter": lambda_fn.ConversionBatch(
+            src="s3://fake_bucket/my_json_cohort/encounter/*.ndjson",
+            dest="s3://fake_bucket/my_json_cohort/encounter/encounter_compacted.parquet",
+            delete_prefix="my_json_cohort/encounter",
+        ),
+    }
+
+
+def test_batch_into_fhir_types_decodes_s3_keys():
+    event = {
+        "Records": [
+            with_key("my_json_cohort/patient/Patient%20000.ndjson"),
+        ]
+    }
+
+    batches, bucket_name = lambda_fn.batch_into_fhir_types(event)
+
+    assert bucket_name == "fake_bucket"
+    assert batches["patient"].src == "s3://fake_bucket/my_json_cohort/patient/*.ndjson"
+
+
+def test_batch_into_fhir_types_with_local_file(tmp_path):
+    local_path = str(tmp_path / "my_cohort" / "patient" / "Patient.000.ndjson")
+
+    batches, bucket_name = lambda_fn.batch_into_fhir_types(
+        {"Records": [with_local_path(local_path)]}
+    )
+
+    assert bucket_name is None
+    assert batches == {
+        "Patient.000.ndjson": lambda_fn.ConversionBatch(
+            src=str(tmp_path / "my_cohort" / "patient" / "*.ndjson"),
+            dest=str(
+                tmp_path
+                / "my_cohort"
+                / "patient"
+                / "Patient.000.ndjson_compacted.parquet"
+            ),
+            delete_prefix=str(tmp_path / "my_cohort" / "patient"),
+        )
+    }
+
+
+def test_batch_into_fhir_types_ignores_files_in_raw():
+    event = {
+        "Records": [
+            with_key("my_json_cohort/patient/raw/Patient.000.ndjson"),
+        ]
+    }
+
+    batches, bucket_name = lambda_fn.batch_into_fhir_types(event)
+
+    assert batches == {}
+    assert bucket_name == "fake_bucket"
+
+
+def test_batch_into_fhir_types_ignores_local_files_in_raw(tmp_path):
+    local_path = str(tmp_path / "my_cohort" / "patient" / "raw" / "Patient.000.ndjson")
+
+    batches, bucket_name = lambda_fn.batch_into_fhir_types(
+        {"Records": [with_local_path(local_path)]}
+    )
+
+    assert batches == {}
+    assert bucket_name is None
 
 
 @moto.mock_aws
